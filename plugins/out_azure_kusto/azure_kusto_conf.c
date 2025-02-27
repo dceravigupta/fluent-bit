@@ -601,26 +601,30 @@ struct flb_azure_kusto *flb_azure_kusto_conf_create(struct flb_output_instance *
         return NULL;
     }
 
-    /* config: 'tenant_id' */
-    if (ctx->tenant_id == NULL) {
-        flb_plg_error(ctx->ins, "property 'tenant_id' is not defined.");
-        flb_azure_kusto_conf_destroy(ctx);
-        return NULL;
-    }
+    if (ctx->managed_identity_id == NULL) {
+        /* config: 'tenant_id' */
+        if (ctx->tenant_id == NULL) {
+            flb_plg_error(ctx->ins, "property 'tenant_id' is not defined.");
+            flb_azure_kusto_conf_destroy(ctx);
+            return NULL;
+        }
 
-    /* config: 'client_id' */
-    if (ctx->client_id == NULL) {
-        flb_plg_error(ctx->ins, "property 'client_id' is not defined");
-        flb_azure_kusto_conf_destroy(ctx);
-        return NULL;
+        /* config: 'client_id' */
+        if (ctx->client_id == NULL) {
+            flb_plg_error(ctx->ins, "property 'client_id' is not defined");
+            flb_azure_kusto_conf_destroy(ctx);
+            return NULL;
+        }
+    
+        /* config: 'client_secret' */
+        if (ctx->client_secret == NULL) {
+            flb_plg_error(ctx->ins, "property 'client_secret' is not defined");
+            flb_azure_kusto_conf_destroy(ctx);
+            return NULL;
+        }
     }
-
-    /* config: 'client_secret' */
-    if (ctx->client_secret == NULL) {
-        flb_plg_error(ctx->ins, "property 'client_secret' is not defined");
-        flb_azure_kusto_conf_destroy(ctx);
-        return NULL;
-    }
+    else
+    {
 
     /* config: 'ingestion_endpoint' */
     if (ctx->ingestion_endpoint == NULL) {
