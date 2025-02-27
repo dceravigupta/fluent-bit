@@ -623,8 +623,6 @@ struct flb_azure_kusto *flb_azure_kusto_conf_create(struct flb_output_instance *
             return NULL;
         }
     }
-    else
-    {
 
     /* config: 'ingestion_endpoint' */
     if (ctx->ingestion_endpoint == NULL) {
