@@ -30,6 +30,11 @@
 #include "azure_kusto_conf.h"
 #include "azure_kusto_ingest.h"
 
+static int azure_kusto_get_msi_token(struct flb_azure_kusto *ctx)
+{
+
+}
+
 /* Create a new oauth2 context and get a oauth2 token */
 static int azure_kusto_get_oauth2_token(struct flb_azure_kusto *ctx)
 {
