@@ -290,6 +290,107 @@ static int cb_azure_kusto_init(struct flb_output_instance *ins, struct flb_confi
     return 0;
 }
 
+static msgpack_object *local_msgpack_map_lookup(
+                            msgpack_object *map_object,
+                            char *key)
+{
+    size_t              key_length;
+    size_t              index;
+    msgpack_object_map *map;
+
+    if (key == NULL) {
+        return NULL;
+    }
+
+    if (map_object == NULL) {
+        return NULL;
+    }
+
+    if (map_object->type != MSGPACK_OBJECT_MAP) {
+        return NULL;
+    }
+
+    map = &map_object->via.map;
+
+    key_length = strlen(key);
+
+    for (index = 0; index < map->size ; index++) {
+        if (map->ptr[index].key.type == MSGPACK_OBJECT_STR) {
+            if (map->ptr[index].key.via.str.size == key_length) {
+                if (strncmp(map->ptr[index].key.via.str.ptr,
+                            key,
+                            key_length) == 0) {
+                    return &map->ptr[index].val;
+                }
+            }
+        }
+    }
+
+    return NULL;
+}
+
+static int local_msgpack_map_string_lookup(
+                msgpack_object *map_object,
+                char *key,
+                char **value,
+                size_t *value_size)
+{
+    msgpack_object *value_object;
+
+    value_object = local_msgpack_map_lookup(map_object, key);
+
+    if (value_object == NULL) {
+        return -1;
+    }
+
+    if (value_object->type != MSGPACK_OBJECT_STR) {
+        return -2;
+    }
+
+    *value = (char *) value_object->via.str.ptr;
+    *value_size = value_object->via.str.size;
+
+    return 0;
+}
+
+static int local_msgpack_map_string_extract(
+                msgpack_object *map_object,
+                char *key,
+                char *output_buffer,
+                size_t output_buffer_size)
+{
+    size_t value_size;
+    int    result;
+    char  *value;
+
+    result = local_msgpack_map_string_lookup(map_object,
+                                             key,
+                                             &value,
+                                             &value_size);
+
+    if (result != 0) {
+        return -1;
+    }
+
+    if (value_size >= output_buffer_size) {
+        return -2;
+    }
+
+    strncpy(output_buffer,
+            value,
+            value_size);
+
+    output_buffer[value_size] = '\0';
+
+    return 0;
+}
+
+static inline void local_msgpack_pack_cstr(msgpack_packer *packer, char *value)
+{
+    msgpack_pack_str(packer, strlen(value));
+    msgpack_pack_str_body(packer, value, strlen(value));
+}
+
 static int pack_otel_data(msgpack_packer *mp_pck,
                           msgpack_object *group_metadata,
                           msgpack_object *group_attributes,
@@ -322,19 +423,10 @@ static int pack_otel_data(msgpack_packer *mp_pck,
 
         if (source_map != NULL) {
             source_map_resource_attributes = FLB_TRUE;
-            value = local_msgpack_map_lookup(source_map, "host.name");
-
-            if (value != NULL) {
-                local_msgpack_pack_cstr(mp_pck, "host");
-                msgpack_pack_object(mp_pck, *value);
-            }
-            else {
-                return -2;
-            }
         }
     }
 
-    local_msgpack_pack_cstr(mp_pck, "fields");
+    //local_msgpack_pack_cstr(mp_pck, "fields");
 
     /* check if we have resource attributes to pack */
     if (source_map_resource_attributes == FLB_TRUE) {
@@ -344,7 +436,7 @@ static int pack_otel_data(msgpack_packer *mp_pck,
         }
     }
 
-    source_map = local_msgpack_map_lookup(record_attributes, "otlp");
+/*    source_map = local_msgpack_map_lookup(record_attributes, "otlp");
 
     if (source_map != NULL) {
         value = local_msgpack_map_lookup(source_map, "severity_number");
@@ -373,13 +465,11 @@ static int pack_otel_data(msgpack_packer *mp_pck,
             source_map->type == MSGPACK_OBJECT_MAP) {
 
             for (index = 0; index < source_map->via.map.size ; index++) {
-                flb_mp_map_header_append(&mh_tmp);
-
                 msgpack_pack_object(mp_pck, source_map->via.map.ptr[index].key);
                 msgpack_pack_object(mp_pck, source_map->via.map.ptr[index].val);
             }
         }
-    }
+    }*/
 
     return 0;
 }
@@ -397,6 +487,7 @@ static int azure_kusto_format(struct flb_azure_kusto *ctx, const char *tag, int 
     char time_formatted[32];
     size_t s;
     int len;
+    int result;
     struct flb_log_event_decoder log_decoder;
     struct flb_log_event         log_event;
     int                          ret;
@@ -468,14 +559,30 @@ static int azure_kusto_format(struct flb_azure_kusto *ctx, const char *tag, int 
         msgpack_pack_str(&mp_pck, flb_sds_len(ctx->log_key));
         msgpack_pack_str_body(&mp_pck, ctx->log_key, flb_sds_len(ctx->log_key));
 
+        printf("\n\n");
+	printf("GROUP METADATA : \n\n");
+	msgpack_object_print(stdout, *log_event.group_metadata);
+        printf("\n\n");
+
+        printf("GROUP ATTRIBUTES : \n\n");
+        msgpack_object_print(stdout, *log_event.group_attributes);
+        printf("\n\n");
+
+        printf("GROUP BODY : \n\n");
+        msgpack_object_print(stdout, *log_event.body);
+        printf("\n\n");
+
+        printf("METADATA : \n\n");
+        msgpack_object_print(stdout, *log_event.metadata);
+        printf("\n\n");
+
         /* Pack Otel specific metadata */
         if (log_event.group_attributes != NULL) {
-            result = pack_otel_data(ctx,
-                mp_pck,
-                &mh,
-                *log_event.group_metadata,
-                *log_event.group_attributes,
-                *log_event.metadata);
+            result = pack_otel_data(
+                &mp_pck,
+                log_event.group_metadata,
+                log_event.group_attributes,
+                log_event.metadata);
 
             if (result != 0) {
                 flb_plg_error(ctx->ins, "error packing OTEL day");
