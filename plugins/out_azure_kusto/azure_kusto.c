@@ -373,7 +373,25 @@ static int azure_kusto_format(struct flb_azure_kusto *ctx, const char *tag, int 
 
         msgpack_pack_str(&mp_pck, flb_sds_len(ctx->log_key));
         msgpack_pack_str_body(&mp_pck, ctx->log_key, flb_sds_len(ctx->log_key));
-        msgpack_pack_object(&mp_pck, *log_event.body);
+        msgpack_pack_map(&mp_pck, 3);
+
+        /* Pack Otel specific metadata */
+        if (log_event.group_attributes != NULL) {
+            msgpack_pack_str(&mp_pck, flb_sds_len("metadata"));
+            msgpack_pack_str_body(&mp_pck, "metadata", flb_sds_len("metadata"));
+            msgpack_pack_object(&mp_pck, *log_event.group_attributes);
+
+            msgpack_pack_str(&mp_pck, flb_sds_len("resource"));
+            msgpack_pack_str_body(&mp_pck, "resource", flb_sds_len("resource"));
+            msgpack_pack_object(&mp_pck, *log_event.record_attributes);
+
+            msgpack_pack_str(&mp_pck, flb_sds_len("log_record"));
+            msgpack_pack_str_body(&mp_pck, "log_record", flb_sds_len("log_record"));
+            msgpack_pack_object(&mp_pck, *log_event.group_metadata);
+        }
+        else {
+            msgpack_pack_object(&mp_pck, *log_event.body);
+        }
     }
 
     /* Convert from msgpack to JSON */
