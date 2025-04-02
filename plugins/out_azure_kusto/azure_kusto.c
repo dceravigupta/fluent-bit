@@ -361,9 +361,11 @@ static int azure_kusto_format(struct flb_azure_kusto *ctx, const char *tag, int 
         }
     }
 
-    /* Convert from msgpack to JSON */
-    flb_plg_debug(ctx->ins, "Converting msgpack to JSON, size: %zu", mp_sbuf.size);
-    out_buf = flb_msgpack_raw_to_json_sds(mp_sbuf.data, mp_sbuf.size);
+    /* Convert from msgpack to JSON using flb_pack_msgpack_to_json_format */
+    out_buf = flb_pack_msgpack_to_json_format(mp_sbuf.data, mp_sbuf.size,
+                                             FLB_PACK_JSON_FORMAT_LINES,
+                                             FLB_PACK_JSON_DATE_ISO8601,
+                                             NULL);
 
     /* Cleanup */
     flb_log_event_decoder_destroy(&log_decoder);
