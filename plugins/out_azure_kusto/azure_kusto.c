@@ -339,41 +339,18 @@ static int azure_kusto_format(struct flb_azure_kusto *ctx, const char *tag, int 
                      log_event.body ? log_event.body->type : -1);
 
         /* Start a new map for this log event */
-        msgpack_pack_map(&mp_pck, 3);  /* We'll have 3 fields: body, timestamp, and metadata */
+        msgpack_pack_map(&mp_pck, 2);  /* We'll have 2 fields: body and timestamp */
+
+        /* Pack the timestamp first */
+        msgpack_pack_str(&mp_pck, 9);
+        msgpack_pack_str_body(&mp_pck, "timestamp", 9);
+        msgpack_pack_uint64(&mp_pck, (uint64_t)log_event.timestamp);
 
         /* Pack the log body */
         msgpack_pack_str(&mp_pck, 4);
         msgpack_pack_str_body(&mp_pck, "body", 4);
         if (log_event.body) {
             msgpack_pack_object(&mp_pck, *log_event.body);
-        } else {
-            msgpack_pack_nil(&mp_pck);
-        }
-
-        /* Pack the timestamp */
-        msgpack_pack_str(&mp_pck, 9);
-        msgpack_pack_str_body(&mp_pck, "timestamp", 9);
-        msgpack_pack_uint64(&mp_pck, log_event.timestamp.tm.tv_sec);
-
-        /* Pack the metadata */
-        msgpack_pack_str(&mp_pck, 8);
-        msgpack_pack_str_body(&mp_pck, "metadata", 8);
-        msgpack_pack_map(&mp_pck, 2);  /* Two metadata fields: attributes and metadata */
-        
-        /* Pack group attributes */
-        msgpack_pack_str(&mp_pck, 10);
-        msgpack_pack_str_body(&mp_pck, "attributes", 10);
-        if (log_event.group_attributes) {
-            msgpack_pack_object(&mp_pck, *log_event.group_attributes);
-        } else {
-            msgpack_pack_nil(&mp_pck);
-        }
-
-        /* Pack group metadata */
-        msgpack_pack_str(&mp_pck, 8);
-        msgpack_pack_str_body(&mp_pck, "metadata", 8);
-        if (log_event.group_metadata) {
-            msgpack_pack_object(&mp_pck, *log_event.group_metadata);
         } else {
             msgpack_pack_nil(&mp_pck);
         }
