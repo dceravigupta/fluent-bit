@@ -353,7 +353,7 @@ static int azure_kusto_format(struct flb_azure_kusto *ctx, const char *tag, int 
         /* Pack the timestamp */
         msgpack_pack_str(&mp_pck, 9);
         msgpack_pack_str_body(&mp_pck, "timestamp", 9);
-        msgpack_pack_int64(&mp_pck, (int64_t)log_event.timestamp);
+        msgpack_pack_uint64(&mp_pck, log_event.timestamp.tm.tv_sec);
 
         /* Pack the metadata */
         msgpack_pack_str(&mp_pck, 8);
