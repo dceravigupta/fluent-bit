@@ -316,12 +316,13 @@ static int azure_kusto_format(struct flb_azure_kusto *ctx, const char *tag, int 
         return -1;
     }
 
+    flb_plg_debug(ctx->ins, "Processing %d records from OpenTelemetry", records);
+
     ret = flb_log_event_decoder_init(&log_decoder, (char *) data, bytes);
 
     if (ret != FLB_EVENT_DECODER_SUCCESS) {
         flb_plg_error(ctx->ins,
                       "Log event decoder initialization error : %d", ret);
-
         return -1;
     }
 
@@ -334,49 +335,35 @@ static int azure_kusto_format(struct flb_azure_kusto *ctx, const char *tag, int 
     while ((ret = flb_log_event_decoder_next(
                     &log_decoder,
                     &log_event)) == FLB_EVENT_DECODER_SUCCESS) {
-        map_size = 1;
-        if (ctx->include_time_key == FLB_TRUE) {
-            map_size++;
+        flb_plg_debug(ctx->ins, "Processing log event, body type: %d", 
+                     log_event.body ? log_event.body->type : -1);
+
+        /* Always create a map with at least the log body */
+        msgpack_pack_map(&mp_pck, 1);
+
+        /* Pack the log body */
+        if (log_event.body) {
+            msgpack_pack_str(&mp_pck, flb_sds_len(ctx->log_key));
+            msgpack_pack_str_body(&mp_pck, ctx->log_key, flb_sds_len(ctx->log_key));
+            
+            /* For debugging */
+            if (log_event.body->type == MSGPACK_OBJECT_MAP) {
+                flb_plg_debug(ctx->ins, "Log body is a map with %d fields", 
+                             log_event.body->via.map.size);
+            }
+            
+            msgpack_pack_object(&mp_pck, *log_event.body);
         }
-
-        if (ctx->include_tag_key == FLB_TRUE) {
-            map_size++;
+        else {
+            flb_plg_debug(ctx->ins, "Log body is NULL");
+            msgpack_pack_str(&mp_pck, flb_sds_len(ctx->log_key));
+            msgpack_pack_str_body(&mp_pck, ctx->log_key, flb_sds_len(ctx->log_key));
+            msgpack_pack_nil(&mp_pck);
         }
-
-        msgpack_pack_map(&mp_pck, map_size);
-
-        /* include_time_key */
-        if (ctx->include_time_key == FLB_TRUE) {
-            msgpack_pack_str(&mp_pck, flb_sds_len(ctx->time_key));
-            msgpack_pack_str_body(&mp_pck, ctx->time_key, flb_sds_len(ctx->time_key));
-
-            /* Append the time value as ISO 8601 */
-            gmtime_r(&log_event.timestamp.tm.tv_sec, &tms);
-            s = strftime(time_formatted, sizeof(time_formatted) - 1,
-                         FLB_PACK_JSON_DATE_ISO8601_FMT, &tms);
-
-            len = snprintf(time_formatted + s, sizeof(time_formatted) - 1 - s,
-                           ".%03" PRIu64 "Z",
-                           (uint64_t)log_event.timestamp.tm.tv_nsec / 1000000);
-            s += len;
-            msgpack_pack_str(&mp_pck, s);
-            msgpack_pack_str_body(&mp_pck, time_formatted, s);
-        }
-
-        /* include_tag_key */
-        if (ctx->include_tag_key == FLB_TRUE) {
-            msgpack_pack_str(&mp_pck, flb_sds_len(ctx->tag_key));
-            msgpack_pack_str_body(&mp_pck, ctx->tag_key, flb_sds_len(ctx->tag_key));
-            msgpack_pack_str(&mp_pck, tag_len);
-            msgpack_pack_str_body(&mp_pck, tag, tag_len);
-        }
-
-        msgpack_pack_str(&mp_pck, flb_sds_len(ctx->log_key));
-        msgpack_pack_str_body(&mp_pck, ctx->log_key, flb_sds_len(ctx->log_key));
-        msgpack_pack_object(&mp_pck, *log_event.body);
     }
 
     /* Convert from msgpack to JSON */
+    flb_plg_debug(ctx->ins, "Converting msgpack to JSON, size: %zu", mp_sbuf.size);
     out_buf = flb_msgpack_raw_to_json_sds(mp_sbuf.data, mp_sbuf.size);
 
     /* Cleanup */
@@ -387,6 +374,8 @@ static int azure_kusto_format(struct flb_azure_kusto *ctx, const char *tag, int 
         flb_plg_error(ctx->ins, "error formatting JSON payload");
         return -1;
     }
+
+    flb_plg_debug(ctx->ins, "Successfully converted to JSON, size: %zu", flb_sds_len(out_buf));
 
     *out_data = out_buf;
     *out_size = flb_sds_len(out_buf);
