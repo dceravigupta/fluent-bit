@@ -338,34 +338,49 @@ static int azure_kusto_format(struct flb_azure_kusto *ctx, const char *tag, int 
         flb_plg_debug(ctx->ins, "Processing log event, body type: %d", 
                      log_event.body ? log_event.body->type : -1);
 
+        /* Start a new map for this log event */
+        msgpack_pack_map(&mp_pck, 3);  /* We'll have 3 fields: body, timestamp, and metadata */
+
+        /* Pack the log body */
+        msgpack_pack_str(&mp_pck, 4);
+        msgpack_pack_str_body(&mp_pck, "body", 4);
         if (log_event.body) {
-            /* For debugging */
-            if (log_event.body->type == MSGPACK_OBJECT_MAP) {
-                flb_plg_debug(ctx->ins, "Log body is a map with %d fields", 
-                             log_event.body->via.map.size);
-                /* Print the first key-value pair for debugging */
-                if (log_event.body->via.map.size > 0) {
-                    msgpack_object *k = &log_event.body->via.map.ptr[0].key;
-                    msgpack_object *v = &log_event.body->via.map.ptr[0].val;
-                    flb_plg_debug(ctx->ins, "First field - key type: %d, value type: %d", 
-                                 k->type, v->type);
-                }
-            }
-            
-            /* Directly pack the log body without wrapping */
             msgpack_pack_object(&mp_pck, *log_event.body);
+        } else {
+            msgpack_pack_nil(&mp_pck);
         }
-        else {
-            flb_plg_debug(ctx->ins, "Log body is NULL");
+
+        /* Pack the timestamp */
+        msgpack_pack_str(&mp_pck, 9);
+        msgpack_pack_str_body(&mp_pck, "timestamp", 9);
+        msgpack_pack_uint64(&mp_pck, log_event.timestamp);
+
+        /* Pack the metadata */
+        msgpack_pack_str(&mp_pck, 8);
+        msgpack_pack_str_body(&mp_pck, "metadata", 8);
+        msgpack_pack_map(&mp_pck, 2);  /* Two metadata fields: attributes and metadata */
+        
+        /* Pack group attributes */
+        msgpack_pack_str(&mp_pck, 10);
+        msgpack_pack_str_body(&mp_pck, "attributes", 10);
+        if (log_event.group_attributes) {
+            msgpack_pack_object(&mp_pck, *log_event.group_attributes);
+        } else {
+            msgpack_pack_nil(&mp_pck);
+        }
+
+        /* Pack group metadata */
+        msgpack_pack_str(&mp_pck, 8);
+        msgpack_pack_str_body(&mp_pck, "metadata", 8);
+        if (log_event.group_metadata) {
+            msgpack_pack_object(&mp_pck, *log_event.group_metadata);
+        } else {
             msgpack_pack_nil(&mp_pck);
         }
     }
 
-    /* Convert from msgpack to JSON using flb_pack_msgpack_to_json_format */
-    out_buf = flb_pack_msgpack_to_json_format(mp_sbuf.data, mp_sbuf.size,
-                                             FLB_PACK_JSON_FORMAT_LINES,
-                                             FLB_PACK_JSON_DATE_ISO8601,
-                                             NULL);
+    /* Convert from msgpack to JSON */
+    out_buf = flb_msgpack_raw_to_json_sds(mp_sbuf.data, mp_sbuf.size);
 
     /* Cleanup */
     flb_log_event_decoder_destroy(&log_decoder);
