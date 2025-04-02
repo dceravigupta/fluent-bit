@@ -23,6 +23,8 @@
 
 /* Test data */
 #include "data/common/json_invalid.h" /* JSON_INVALID */
+#include "data/common/json_long.h"    /* JSON_LONG    */
+#include "data/common/json_small.h"   /* JSON_SMALL   */
 
 /* Test functions */
 void flb_test_azure_kusto_json_invalid(void);
