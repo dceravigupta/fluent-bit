@@ -297,12 +297,6 @@ static int azure_kusto_format(struct flb_azure_kusto *ctx, const char *tag, int 
     int records = 0;
     msgpack_sbuffer mp_sbuf;
     msgpack_packer mp_pck;
-    /* for sub msgpack objs */
-    int map_size;
-    struct tm tms;
-    char time_formatted[32];
-    size_t s;
-    int len;
     struct flb_log_event_decoder log_decoder;
     struct flb_log_event         log_event;
     int                          ret;
@@ -344,7 +338,7 @@ static int azure_kusto_format(struct flb_azure_kusto *ctx, const char *tag, int 
         /* Pack the timestamp first */
         msgpack_pack_str(&mp_pck, 9);
         msgpack_pack_str_body(&mp_pck, "timestamp", 9);
-        msgpack_pack_uint64(&mp_pck, (uint64_t)log_event.timestamp);
+        msgpack_pack_uint64(&mp_pck, (uint64_t)log_event.timestamp.tm.tv_sec);
 
         /* Pack the log body */
         msgpack_pack_str(&mp_pck, 4);
