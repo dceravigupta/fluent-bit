@@ -338,26 +338,25 @@ static int azure_kusto_format(struct flb_azure_kusto *ctx, const char *tag, int 
         flb_plg_debug(ctx->ins, "Processing log event, body type: %d", 
                      log_event.body ? log_event.body->type : -1);
 
-        /* Always create a map with at least the log body */
-        msgpack_pack_map(&mp_pck, 1);
-
-        /* Pack the log body */
         if (log_event.body) {
-            msgpack_pack_str(&mp_pck, flb_sds_len(ctx->log_key));
-            msgpack_pack_str_body(&mp_pck, ctx->log_key, flb_sds_len(ctx->log_key));
-            
             /* For debugging */
             if (log_event.body->type == MSGPACK_OBJECT_MAP) {
                 flb_plg_debug(ctx->ins, "Log body is a map with %d fields", 
                              log_event.body->via.map.size);
+                /* Print the first key-value pair for debugging */
+                if (log_event.body->via.map.size > 0) {
+                    msgpack_object *k = &log_event.body->via.map.ptr[0].key;
+                    msgpack_object *v = &log_event.body->via.map.ptr[0].val;
+                    flb_plg_debug(ctx->ins, "First field - key type: %d, value type: %d", 
+                                 k->type, v->type);
+                }
             }
             
+            /* Directly pack the log body without wrapping */
             msgpack_pack_object(&mp_pck, *log_event.body);
         }
         else {
             flb_plg_debug(ctx->ins, "Log body is NULL");
-            msgpack_pack_str(&mp_pck, flb_sds_len(ctx->log_key));
-            msgpack_pack_str_body(&mp_pck, ctx->log_key, flb_sds_len(ctx->log_key));
             msgpack_pack_nil(&mp_pck);
         }
     }
