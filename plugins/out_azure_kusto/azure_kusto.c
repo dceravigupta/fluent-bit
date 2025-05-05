@@ -1004,7 +1004,11 @@ static int azure_kusto_traces_format(struct flb_azure_kusto *ctx, const char *ta
                 printf("ROOT key type: %d\n\n", key.type);
                 msgpack_object_print(stdout, key);
 
-                printf("ROOT key: %s\n\n", key.via.str.ptr);
+                val = root->via.map.ptr[i].val;
+                printf("ROOT VAL type: %d\n\n", val.type);
+                msgpack_object_print(stdout, val);
+                
+                printf("\n\nROOT key: %s\n\n", key.via.str.ptr);
             }
         }
 
