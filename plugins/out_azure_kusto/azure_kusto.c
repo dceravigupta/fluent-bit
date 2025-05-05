@@ -972,6 +972,8 @@ static int azure_kusto_traces_format(struct flb_azure_kusto *ctx, const char *ta
     size_t off = 0;
     msgpack_unpacked result;
     msgpack_object *root;
+    msgpack_object key;
+    msgpack_object val;
 
     /* Initialize the output buffer */
     out_buf = flb_sds_create_size(1024);
@@ -999,7 +1001,7 @@ static int azure_kusto_traces_format(struct flb_azure_kusto *ctx, const char *ta
         if (root->type == MSGPACK_OBJECT_MAP) {
             for (i = 0; i < root->via.map.size; i++) {
                 key = root->via.map.ptr[i].key;
-                printf("ROOT key : %s\n\n", key);
+                printf("ROOT key type: %s\n\n", key.type);
             }
         }
 
