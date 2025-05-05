@@ -1065,7 +1065,7 @@ static int azure_kusto_traces_format(struct flb_azure_kusto *ctx, const char *ta
  //       out_buf = flb_sds_cat(out_buf, json_record, flb_sds_len(json_record));
  //       out_buf = flb_sds_cat(out_buf, "\n", 1);
 
-        flb_sds_destroy(json_record);
+ //       flb_sds_destroy(json_record);
     }
 
     msgpack_sbuffer_destroy(&mp_sbuf);
