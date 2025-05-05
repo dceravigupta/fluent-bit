@@ -1001,7 +1001,8 @@ static int azure_kusto_traces_format(struct flb_azure_kusto *ctx, const char *ta
         if (root->type == MSGPACK_OBJECT_MAP) {
             for (i = 0; i < root->via.map.size; i++) {
                 key = root->via.map.ptr[i].key;
-                printf("ROOT key type: %s\n\n", key.type);
+                printf("ROOT key type: %d\n\n", key.type);
+                msgpack_object_print(stdout, key);
             }
         }
 
