@@ -992,6 +992,8 @@ static int azure_kusto_traces_format(struct flb_azure_kusto *ctx, const char *ta
         msgpack_object_print(stdout, *root);
         printf("\n\n");
 
+        printf("ROOT Type : %d\n\n", root->type);
+
  //       int map_size = 1;
  //       if (ctx->include_time_key == FLB_TRUE) {
  //           map_size++;
