@@ -937,6 +937,144 @@ static int cb_azure_kusto_init(struct flb_output_instance *ins, struct flb_confi
     return 0;
 }
 
+/**
+     * This function formats trace data for Azure Kusto ingestion.
+     * It processes a batch of traces, encodes them in a specific format,
+     * and outputs the formatted data.
+     *
+     * Parameters:
+     * - ctx: Context containing configuration and state for Azure Kusto.
+     * - tag: A string tag associated with the log data.
+     * - tag_len: Length of the tag string.
+     * - data: Pointer to the raw log data in msgpack format.
+     * - bytes: Size of the raw log data.
+     * - out_data: Pointer to store the formatted output data.
+     * - out_size: Pointer to store the size of the formatted output data.
+     *
+     * Returns:
+     * - 0 on success, or -1 on error.
+     */
+static int azure_kusto_traces_format(struct flb_azure_kusto *ctx, const char *tag, int tag_len,
+                                     const void *data, size_t bytes, void **out_data,
+                                     size_t *out_size)
+{
+    int index;
+    msgpack_sbuffer mp_sbuf;
+    msgpack_packer mp_pck;
+    struct tm tms;
+    char time_formatted[32];
+    size_t s;
+    int len;
+    int ret;
+    flb_sds_t out_buf;
+
+    size_t off = 0;
+    msgpack_unpacked result;
+    msgpack_object *root;
+
+    /* Initialize the output buffer */
+    out_buf = flb_sds_create_size(1024);
+    if (!out_buf) {
+        flb_plg_error(ctx->ins, "error creating output buffer");
+        return -1;
+    }
+
+    /* Create temporary msgpack buffer */
+    msgpack_sbuffer_init(&mp_sbuf);
+    msgpack_packer_init(&mp_pck, &mp_sbuf, msgpack_sbuffer_write);
+
+    msgpack_unpacked_init(&result);
+    while ((ret = msgpack_unpack_next(&result, data, bytes, &off)) == MSGPACK_UNPACK_SUCCESS) {
+        msgpack_sbuffer_clear(&mp_sbuf);
+
+        root = result.data;
+        printf("ROOT : \n\n");
+        msgpack_object_print(stdout, *root);
+        printf("\n\n");
+
+ //       int map_size = 1;
+ //       if (ctx->include_time_key == FLB_TRUE) {
+ //           map_size++;
+ //       }
+ //       if (ctx->include_tag_key == FLB_TRUE) {
+ //           map_size++;
+ //       }
+ //
+ //       msgpack_pack_map(&mp_pck, map_size);
+ //
+ //       /* include_time_key */
+ //       if (ctx->include_time_key == FLB_TRUE) {
+ //           msgpack_pack_str(&mp_pck, flb_sds_len(ctx->time_key));
+ //           msgpack_pack_str_body(&mp_pck, ctx->time_key, flb_sds_len(ctx->time_key));
+ //
+ //           gmtime_r(&log_event.timestamp.tm.tv_sec, &tms);
+ //           s = strftime(time_formatted, sizeof(time_formatted) - 1, FLB_PACK_JSON_DATE_ISO8601_FMT, &tms);
+ //           len = snprintf(time_formatted + s, sizeof(time_formatted) - 1 - s, ".%03" PRIu64 "Z",
+ //                   (uint64_t) log_event.timestamp.tm.tv_nsec / 1000000);
+ //           s += len;
+ //           msgpack_pack_str(&mp_pck, s);
+ //           msgpack_pack_str_body(&mp_pck, time_formatted, s);
+ //       }
+ //
+ //       /* include_tag_key */
+ //       if (ctx->include_tag_key == FLB_TRUE) {
+ //           msgpack_pack_str(&mp_pck, flb_sds_len(ctx->tag_key));
+ //           msgpack_pack_str_body(&mp_pck, ctx->tag_key, flb_sds_len(ctx->tag_key));
+ //           msgpack_pack_str(&mp_pck, tag_len);
+ //           msgpack_pack_str_body(&mp_pck, tag, tag_len);
+ //       }
+ //
+ //       msgpack_pack_str(&mp_pck, flb_sds_len(ctx->log_key));
+ //       msgpack_pack_str_body(&mp_pck, ctx->log_key, flb_sds_len(ctx->log_key));
+ //
+ //       if (log_event.group_attributes != NULL) {
+ //           msgpack_pack_map(&mp_pck,
+ //                                log_event.group_attributes->via.map.size +
+ //                                log_event.metadata->via.map.size);
+ //
+ //           for (index = 0; index < log_event.group_attributes->via.map.size; index++)
+ //           {
+ //               msgpack_pack_object(&mp_pck, log_event.group_attributes->via.map.ptr[index].key);
+ //               msgpack_pack_object(&mp_pck, log_event.group_attributes->via.map.ptr[index].val);
+ //           }
+ //
+ //           for (index = 0; index < log_event.metadata->via.map.size; index++)
+ //           {
+ //               msgpack_pack_object(&mp_pck, log_event.metadata->via.map.ptr[index].key);
+ //               msgpack_pack_object(&mp_pck, log_event.metadata->via.map.ptr[index].val);
+ //           }
+ //       }
+ //       else if (log_event.body != NULL) {
+ //           msgpack_pack_object(&mp_pck, *log_event.body);
+ //       }
+ //       else {
+ //           msgpack_pack_str(&mp_pck, 20);
+ //           msgpack_pack_str_body(&mp_pck, "log_attribute_missing", 20);
+ //       }
+ //
+ //       flb_sds_t json_record = flb_msgpack_raw_to_json_sds(mp_sbuf.data, mp_sbuf.size);
+ //       if (!json_record) {
+ //           flb_plg_error(ctx->ins, "error converting msgpack to JSON");
+ //           flb_sds_destroy(out_buf);
+ //           msgpack_sbuffer_destroy(&mp_sbuf);
+ //           flb_log_event_decoder_destroy(&log_decoder);
+ //           return -1;
+ //       }
+ //
+ //       /* Concatenate the JSON record to the output buffer */
+ //       out_buf = flb_sds_cat(out_buf, json_record, flb_sds_len(json_record));
+ //       out_buf = flb_sds_cat(out_buf, "\n", 1);
+
+        flb_sds_destroy(json_record);
+    }
+
+    msgpack_sbuffer_destroy(&mp_sbuf);
+
+    *out_data = out_buf;
+    *out_size = flb_sds_len(out_buf);
+
+    return 0;
+}
 
 /**
      * This function formats log data for Azure Kusto ingestion.
@@ -1339,9 +1477,16 @@ static void cb_azure_kusto_flush(struct flb_event_chunk *event_chunk,
     else {
         /* Buffering mode is disabled, proceed with regular flush */
 
-        /* Reformat msgpack data to JSON payload */
-        ret = azure_kusto_format(ctx, event_chunk->tag, tag_len, event_chunk->data,
-                                 event_chunk->size, (void **)&json, &json_size);
+        if (event_chunk->type == FLB_EVENT_TYPE_TRACES) {
+            ret = azure_kusto_traces_format(ctx, event_chunk->tag, tag_len, event_chunk->data,
+                                            event_chunk->size, (void **)&json, &json_size);
+        }
+        else if (event_chunk->type == FLB_EVENT_TYPE_LOGS) {
+            /* Reformat msgpack data to JSON payload */
+            ret = azure_kusto_format(ctx, event_chunk->tag, tag_len, event_chunk->data,
+                                     event_chunk->size, (void **)&json, &json_size);
+        }
+        
         if (ret != 0) {
             flb_plg_error(ctx->ins, "cannot reformat data into json");
             ret = FLB_RETRY;
@@ -1599,6 +1744,7 @@ struct flb_output_plugin out_azure_kusto_plugin = {
     .cb_flush = cb_azure_kusto_flush,
     .cb_exit = cb_azure_kusto_exit,
     .config_map = config_map,
+    .event_type   = FLB_OUTPUT_LOGS | FLB_OUTPUT_TRACES,
     /* Plugin flags */
     .flags = FLB_OUTPUT_NET | FLB_IO_TLS,
 };
