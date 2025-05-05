@@ -958,6 +958,7 @@ static int azure_kusto_traces_format(struct flb_azure_kusto *ctx, const char *ta
                                      const void *data, size_t bytes, void **out_data,
                                      size_t *out_size)
 {
+    int i;
     int index;
     msgpack_sbuffer mp_sbuf;
     msgpack_packer mp_pck;
@@ -992,7 +993,15 @@ static int azure_kusto_traces_format(struct flb_azure_kusto *ctx, const char *ta
         msgpack_object_print(stdout, *root);
         printf("\n\n");
 
+
         printf("ROOT Type : %d\n\n", root->type);
+
+        if (root->type == MSGPACK_OBJECT_MAP) {
+            for (i = 0; i < root->via.map.size; i++) {
+                key = root->via.map.ptr[i].key;
+                printf("ROOT key : %s\n\n", key);
+            }
+        }
 
  //       int map_size = 1;
  //       if (ctx->include_time_key == FLB_TRUE) {
