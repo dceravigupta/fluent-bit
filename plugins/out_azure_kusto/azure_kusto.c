@@ -987,7 +987,7 @@ static int azure_kusto_traces_format(struct flb_azure_kusto *ctx, const char *ta
     while ((ret = msgpack_unpack_next(&result, data, bytes, &off)) == MSGPACK_UNPACK_SUCCESS) {
         msgpack_sbuffer_clear(&mp_sbuf);
 
-        root = result.data;
+        root = &result.data;
         printf("ROOT : \n\n");
         msgpack_object_print(stdout, *root);
         printf("\n\n");
