@@ -997,7 +997,7 @@ static int azure_kusto_traces_format(struct flb_azure_kusto *ctx, const char *ta
                                      const void *data, size_t bytes, void **out_data,
                                      size_t *out_size)
 {
-    int i, j;
+    int i, j, k;
     int index;
     msgpack_sbuffer mp_sbuf;
     msgpack_packer mp_pck;
