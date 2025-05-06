@@ -1025,6 +1025,7 @@ static int azure_kusto_traces_format(struct flb_azure_kusto *ctx, const char *ta
                 // msgpack_object_print(stdout, val);
                 
                 //printf("\n\nROOT key: %s\n\n", key.via.str.ptr);
+                }
             }
         }
 
