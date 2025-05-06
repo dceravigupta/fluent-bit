@@ -1086,9 +1086,9 @@ static int azure_kusto_traces_format(struct flb_azure_kusto *ctx, const char *ta
                         //if (ctx->include_time_key == false) {
                         //    map_size++;
                         //}
-                        if (ctx->include_tag_key == FLB_TRUE) {
-                            map_size++;
-                        }
+                        //if (ctx->include_tag_key == FLB_TRUE) {
+                        //    map_size++;
+                        //}
                         
                         msgpack_pack_map(&mp_pck, map_size);
                         
