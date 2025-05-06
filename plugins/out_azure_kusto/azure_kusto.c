@@ -958,7 +958,7 @@ static int azure_kusto_traces_format(struct flb_azure_kusto *ctx, const char *ta
                                      const void *data, size_t bytes, void **out_data,
                                      size_t *out_size)
 {
-    int i;
+    int i, j;
     int index;
     msgpack_sbuffer mp_sbuf;
     msgpack_packer mp_pck;
@@ -1001,14 +1001,29 @@ static int azure_kusto_traces_format(struct flb_azure_kusto *ctx, const char *ta
         if (root->type == MSGPACK_OBJECT_MAP) {
             for (i = 0; i < root->via.map.size; i++) {
                 key = root->via.map.ptr[i].key;
-                printf("ROOT key type: %d\n\n", key.type);
-                msgpack_object_print(stdout, key);
 
-                val = root->via.map.ptr[i].val;
-                printf("ROOT VAL type: %d\n\n", val.type);
-                msgpack_object_print(stdout, val);
+                if (key.via.str.size == 13 && strncmp(key.via.str.ptr, "resourceSpans", 13) == 0) {
+                    val = root->via.map.ptr[i].val;
+                    if (val.type == MSGPACK_OBJECT_ARRAY) {
+                        for (j = 0; j < val.via.array.size; j++) {
+                            if (val.via.array.ptr[j].type == MSGPACK_OBJECT_MAP) {
+                                msgpack_object *map = &val.via.array.ptr[j];
+                                printf("MAP %d : \n\n", j);
+                                msgpack_object_print(stdout, *map);
+                            }
+                            
+                        // printf("ROOT VAL type: %d\n\n", val.type);
+                        //msgpack_object_print(stdout, val);
+                    }
+
+                // printf("ROOT key type: %d\n\n", key.type);
+                // msgpack_object_print(stdout, key);
+
+                // val = root->via.map.ptr[i].val;
+                // printf("ROOT VAL type: %d\n\n", val.type);
+                // msgpack_object_print(stdout, val);
                 
-                printf("\n\nROOT key: %s\n\n", key.via.str.ptr);
+                //printf("\n\nROOT key: %s\n\n", key.via.str.ptr);
             }
         }
 
