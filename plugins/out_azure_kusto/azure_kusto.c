@@ -1083,9 +1083,9 @@ static int azure_kusto_traces_format(struct flb_azure_kusto *ctx, const char *ta
                         msgpack_sbuffer_clear(&mp_sbuf);
 
                         int map_size = 1;
-                        if (ctx->include_time_key == false) {
-                            map_size++;
-                        }
+                        //if (ctx->include_time_key == false) {
+                        //    map_size++;
+                        //}
                         if (ctx->include_tag_key == FLB_TRUE) {
                             map_size++;
                         }
@@ -1093,18 +1093,18 @@ static int azure_kusto_traces_format(struct flb_azure_kusto *ctx, const char *ta
                         msgpack_pack_map(&mp_pck, map_size);
                         
                         /* include_time_key */
-                        if (ctx->include_time_key == false) {
-                            msgpack_pack_str(&mp_pck, flb_sds_len(ctx->time_key));
-                            msgpack_pack_str_body(&mp_pck, ctx->time_key, flb_sds_len(ctx->time_key));
-                        
-                            gmtime_r(&log_event.timestamp.tm.tv_sec, &tms);
-                            s = strftime(time_formatted, sizeof(time_formatted) - 1, FLB_PACK_JSON_DATE_ISO8601_FMT, &tms);
-                            len = snprintf(time_formatted + s, sizeof(time_formatted) - 1 - s, ".%03" PRIu64 "Z",
-                                    (uint64_t) log_event.timestamp.tm.tv_nsec / 1000000);
-                            s += len;
-                            msgpack_pack_str(&mp_pck, s);
-                            msgpack_pack_str_body(&mp_pck, time_formatted, s);
-                        }
+                        //if (ctx->include_time_key == false) {
+                        //   msgpack_pack_str(&mp_pck, flb_sds_len(ctx->time_key));
+                        //    msgpack_pack_str_body(&mp_pck, ctx->time_key, flb_sds_len(ctx->time_key));
+                        //
+                        //    gmtime_r(&log_event.timestamp.tm.tv_sec, &tms);
+                        //    s = strftime(time_formatted, sizeof(time_formatted) - 1, FLB_PACK_JSON_DATE_ISO8601_FMT, &tms);
+                        //    len = snprintf(time_formatted + s, sizeof(time_formatted) - 1 - s, ".%03" PRIu64 "Z",
+                        //            (uint64_t) log_event.timestamp.tm.tv_nsec / 1000000);
+                        //    s += len;
+                        //   msgpack_pack_str(&mp_pck, s);
+                        //    msgpack_pack_str_body(&mp_pck, time_formatted, s);
+                        //}
                         
                         /* include_tag_key */
                         if (ctx->include_tag_key == FLB_TRUE) {
