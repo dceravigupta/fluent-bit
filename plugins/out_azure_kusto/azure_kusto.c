@@ -1132,7 +1132,9 @@ static int azure_kusto_traces_format(struct flb_azure_kusto *ctx, const char *ta
 
                         msgpack_pack_str(&mp_pck, flb_sds_len("span"));
                         msgpack_pack_str_body(&mp_pck, "span", flb_sds_len("span"));
-                        msgpack_pack_object(&mp_pck, *span);
+                        msgpack_pack_str(&mp_pck, flb_sds_len("span"));
+                        msgpack_pack_str_body(&mp_pck, "span", flb_sds_len("span"));
+                        //msgpack_pack_object(&mp_pck, *span);
 
                         flb_sds_t json_record = flb_msgpack_raw_to_json_sds(mp_sbuf.data, mp_sbuf.size);
                         if (!json_record){
