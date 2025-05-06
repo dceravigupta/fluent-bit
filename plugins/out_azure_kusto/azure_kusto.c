@@ -937,6 +937,45 @@ static int cb_azure_kusto_init(struct flb_output_instance *ins, struct flb_confi
     return 0;
 }
 
+static msgpack_object *local_msgpack_map_lookup(
+                            msgpack_object *map_object,
+                            char *key)
+{
+    size_t              key_length;
+    size_t              index;
+    msgpack_object_map *map;
+
+    if (key == NULL) {
+        return NULL;
+    }
+
+    if (map_object == NULL) {
+        return NULL;
+    }
+
+    if (map_object->type != MSGPACK_OBJECT_MAP) {
+        return NULL;
+    }
+
+    map = &map_object->via.map;
+
+    key_length = strlen(key);
+
+    for (index = 0; index < map->size ; index++) {
+        if (map->ptr[index].key.type == MSGPACK_OBJECT_STR) {
+            if (map->ptr[index].key.via.str.size == key_length) {
+                if (strncmp(map->ptr[index].key.via.str.ptr,
+                            key,
+                            key_length) == 0) {
+                    return &map->ptr[index].val;
+                }
+            }
+        }
+    }
+
+    return NULL;
+}
+
 /**
      * This function formats trace data for Azure Kusto ingestion.
      * It processes a batch of traces, encodes them in a specific format,
@@ -972,8 +1011,13 @@ static int azure_kusto_traces_format(struct flb_azure_kusto *ctx, const char *ta
     size_t off = 0;
     msgpack_unpacked result;
     msgpack_object *root;
-    msgpack_object key;
-    msgpack_object val;
+    msgpack_object *key;
+    msgpack_object *val;
+    msgpack_object *resource;
+    msgpack_object *schema_url;
+    msgpack_object *scope_spans;
+    msgpack_object *scope;
+    msgpack_object *span;
 
     /* Initialize the output buffer */
     out_buf = flb_sds_create_size(1024);
@@ -990,80 +1034,41 @@ static int azure_kusto_traces_format(struct flb_azure_kusto *ctx, const char *ta
     while ((ret = msgpack_unpack_next(&result, data, bytes, &off)) == MSGPACK_UNPACK_SUCCESS) {
         msgpack_sbuffer_clear(&mp_sbuf);
 
-        root = &result.data;
-        printf("ROOT : \n\n");
-        msgpack_object_print(stdout, *root);
-        printf("\n\n");
-
-
-        printf("ROOT Type : %d\n\n", root->type);
-
-        if (root->type == MSGPACK_OBJECT_MAP) {
-            for (i = 0; i < root->via.map.size; i++) {
-                key = root->via.map.ptr[i].key;
-
-                if (key.via.str.size == 13 && strncmp(key.via.str.ptr, "resourceSpans", 13) == 0) {
-                    val = root->via.map.ptr[i].val;
-                    if (val.type == MSGPACK_OBJECT_ARRAY) {
-                        for (j = 0; j < val.via.array.size; j++) {
-                            if (val.via.array.ptr[j].type == MSGPACK_OBJECT_MAP) {
-                                msgpack_object *map = &val.via.array.ptr[j];
-                                printf("MAP %d : \n\n", j);
-                                msgpack_object_print(stdout, *map);
-                            }
-                            
-                        // printf("ROOT VAL type: %d\n\n", val.type);
-                        //msgpack_object_print(stdout, val);
-                    }
-                }
-
-                // printf("ROOT key type: %d\n\n", key.type);
-                // msgpack_object_print(stdout, key);
-
-                // val = root->via.map.ptr[i].val;
-                // printf("ROOT VAL type: %d\n\n", val.type);
-                // msgpack_object_print(stdout, val);
-                
-                //printf("\n\nROOT key: %s\n\n", key.via.str.ptr);
-                }
-            }
+        int map_size = 1;
+        if (ctx->include_time_key == FLB_TRUE) {
+            map_size++;
         }
-
- //       int map_size = 1;
- //       if (ctx->include_time_key == FLB_TRUE) {
- //           map_size++;
- //       }
- //       if (ctx->include_tag_key == FLB_TRUE) {
- //           map_size++;
- //       }
- //
- //       msgpack_pack_map(&mp_pck, map_size);
- //
- //       /* include_time_key */
- //       if (ctx->include_time_key == FLB_TRUE) {
- //           msgpack_pack_str(&mp_pck, flb_sds_len(ctx->time_key));
- //           msgpack_pack_str_body(&mp_pck, ctx->time_key, flb_sds_len(ctx->time_key));
- //
- //           gmtime_r(&log_event.timestamp.tm.tv_sec, &tms);
- //           s = strftime(time_formatted, sizeof(time_formatted) - 1, FLB_PACK_JSON_DATE_ISO8601_FMT, &tms);
- //           len = snprintf(time_formatted + s, sizeof(time_formatted) - 1 - s, ".%03" PRIu64 "Z",
- //                   (uint64_t) log_event.timestamp.tm.tv_nsec / 1000000);
- //           s += len;
- //           msgpack_pack_str(&mp_pck, s);
- //           msgpack_pack_str_body(&mp_pck, time_formatted, s);
- //       }
- //
- //       /* include_tag_key */
- //       if (ctx->include_tag_key == FLB_TRUE) {
- //           msgpack_pack_str(&mp_pck, flb_sds_len(ctx->tag_key));
- //           msgpack_pack_str_body(&mp_pck, ctx->tag_key, flb_sds_len(ctx->tag_key));
- //           msgpack_pack_str(&mp_pck, tag_len);
- //           msgpack_pack_str_body(&mp_pck, tag, tag_len);
- //       }
- //
- //       msgpack_pack_str(&mp_pck, flb_sds_len(ctx->log_key));
- //       msgpack_pack_str_body(&mp_pck, ctx->log_key, flb_sds_len(ctx->log_key));
- //
+        if (ctx->include_tag_key == FLB_TRUE) {
+            map_size++;
+        }
+ 
+        msgpack_pack_map(&mp_pck, map_size);
+ 
+        /* include_time_key */
+        if (ctx->include_time_key == FLB_TRUE) {
+            msgpack_pack_str(&mp_pck, flb_sds_len(ctx->time_key));
+            msgpack_pack_str_body(&mp_pck, ctx->time_key, flb_sds_len(ctx->time_key));
+ 
+            gmtime_r(&log_event.timestamp.tm.tv_sec, &tms);
+            s = strftime(time_formatted, sizeof(time_formatted) - 1, FLB_PACK_JSON_DATE_ISO8601_FMT, &tms);
+            len = snprintf(time_formatted + s, sizeof(time_formatted) - 1 - s, ".%03" PRIu64 "Z",
+                    (uint64_t) log_event.timestamp.tm.tv_nsec / 1000000);
+            s += len;
+            msgpack_pack_str(&mp_pck, s);
+            msgpack_pack_str_body(&mp_pck, time_formatted, s);
+        }
+ 
+        /* include_tag_key */
+        if (ctx->include_tag_key == FLB_TRUE) {
+            msgpack_pack_str(&mp_pck, flb_sds_len(ctx->tag_key));
+            msgpack_pack_str_body(&mp_pck, ctx->tag_key, flb_sds_len(ctx->tag_key));
+            msgpack_pack_str(&mp_pck, tag_len);
+            msgpack_pack_str_body(&mp_pck, tag, tag_len);
+        }
+ 
+        msgpack_pack_str(&mp_pck, flb_sds_len(ctx->log_key));
+        msgpack_pack_str_body(&mp_pck, ctx->log_key, flb_sds_len(ctx->log_key));
+ 
  //       if (log_event.group_attributes != NULL) {
  //           msgpack_pack_map(&mp_pck,
  //                                log_event.group_attributes->via.map.size +
@@ -1088,6 +1093,242 @@ static int azure_kusto_traces_format(struct flb_azure_kusto *ctx, const char *ta
  //           msgpack_pack_str(&mp_pck, 20);
  //           msgpack_pack_str_body(&mp_pck, "log_attribute_missing", 20);
  //       }
+
+        root = &result.data;
+        if (root->type != MSGPACK_OBJECT_MAP) {
+            flb_plg_error(ctx->ins, "unexpected payload type=%i", root->type);
+        }
+
+        msgpack_object *resourceSpans = local_msgpack_map_lookup(root, "resourceSpans");
+        if (resourceSpans == NULL) {
+            flb_plg_error(ctx->ins, "resourceSpans not found in payload");
+            continue;
+        }
+
+        if (resourceSpans->type != MSGPACK_OBJECT_ARRAY) {
+            flb_plg_error(ctx->ins, "unexpected 'resourceSpans' value type=%i",
+                          resourceSpans->type);
+            continue;
+        }
+
+        for (i = 0; i < resourceSpans->via.array.size; i++) {
+            msgpack_object *resourceSpan = &resourceSpans->via.array.ptr[i];
+            if (resourceSpan->type == MSGPACK_OBJECT_MAP) {
+                resource = local_msgpack_map_lookup(resourceSpan, "resource");
+                schema_url = local_msgpack_map_lookup(resourceSpan, "schema_url");
+                
+                scope_spans = local_msgpack_map_lookup(resourceSpan, "scope_spans");
+                if (scope_spans == NULL) {
+                    flb_plg_error(ctx->ins, "scope_spans not found in resourceSpan");
+                    continue;
+                }
+
+                if (scope_spans->type != MSGPACK_OBJECT_ARRAY) {
+                    flb_plg_error(ctx->ins, "unexpected 'scope_spans' value type=%i",
+                                  scope_spans->type);
+                    continue;
+                }
+
+                for (j = 0; j < scope_spans->via.array.size; j++) {
+                    msgpack_object *scopeSpan = &scope_spans->via.array.ptr[j];
+                    if (scopeSpan->type == MSGPACK_OBJECT_MAP) {
+                        scope = local_msgpack_map_lookup(scopeSpan, "scope");
+                        msgpack_object *spans = local_msgpack_map_lookup(scopeSpan, "spans");
+                        if (spans == NULL) {
+                            flb_plg_error(ctx->ins, "spans not found in scopeSpan");
+                            continue;
+                        }
+
+                        if (spans->type != MSGPACK_OBJECT_ARRAY) {
+                            flb_plg_error(ctx->ins, "unexpected 'spans' value type=%i",
+                                          spans->type);
+                            continue;
+                        }
+
+                        for (k = 0; k < spans->via.array.size; k++) {
+                            msgpack_object *span = &spans->via.array.ptr[k];
+
+                            msgpack_sbuffer_clear(&mp_sbuf);
+
+                            int map_size = 1;
+                            if (ctx->include_time_key == FLB_TRUE) {
+                                map_size++;
+                            }
+                            if (ctx->include_tag_key == FLB_TRUE) {
+                                map_size++;
+                            }
+		                    
+                            msgpack_pack_map(&mp_pck, map_size);
+		                    
+                            /* include_time_key */
+                            if (ctx->include_time_key == FLB_TRUE) {
+                                msgpack_pack_str(&mp_pck, flb_sds_len(ctx->time_key));
+                                msgpack_pack_str_body(&mp_pck, ctx->time_key, flb_sds_len(ctx->time_key));
+		                    
+                                gmtime_r(&log_event.timestamp.tm.tv_sec, &tms);
+                                s = strftime(time_formatted, sizeof(time_formatted) - 1, FLB_PACK_JSON_DATE_ISO8601_FMT, &tms);
+                                len = snprintf(time_formatted + s, sizeof(time_formatted) - 1 - s, ".%03" PRIu64 "Z",
+                                        (uint64_t) log_event.timestamp.tm.tv_nsec / 1000000);
+                                s += len;
+                                msgpack_pack_str(&mp_pck, s);
+                                msgpack_pack_str_body(&mp_pck, time_formatted, s);
+                            }
+		                    
+                            /* include_tag_key */
+                            if (ctx->include_tag_key == FLB_TRUE) {
+                                msgpack_pack_str(&mp_pck, flb_sds_len(ctx->tag_key));
+                                msgpack_pack_str_body(&mp_pck, ctx->tag_key, flb_sds_len(ctx->tag_key));
+                                msgpack_pack_str(&mp_pck, tag_len);
+                                msgpack_pack_str_body(&mp_pck, tag, tag_len);
+                            }
+		                    
+                            msgpack_pack_str(&mp_pck, flb_sds_len(ctx->log_key));
+                            msgpack_pack_str_body(&mp_pck, ctx->log_key, flb_sds_len(ctx->log_key));
+        
+                            msgpack_pack_map(&mp_pck, 4);
+                            
+                            msgpack_pack_str(&mp_pck, flb_sds_len("resource"));
+                            msgpack_pack_str_body(&mp_pck, "resource", flb_sds_len("resource"));
+                            msgpack_pack_object(&mp_pck, *resource);
+
+                            msgpack_pack_str(&mp_pck, flb_sds_len("schema_url"));
+                            msgpack_pack_str_body(&mp_pck, "schema_url", flb_sds_len("schema_url"));
+                            msgpack_pack_object(&mp_pck, *schema_url);
+
+                            msgpack_pack_str(&mp_pck, flb_sds_len("scope"));
+                            msgpack_pack_str_body(&mp_pck, "scope", flb_sds_len("scope"));
+                            msgpack_pack_object(&mp_pck, *scope);
+
+                            msgpack_pack_str(&mp_pck, flb_sds_len("span"));
+                            msgpack_pack_str_body(&mp_pck, "span", flb_sds_len("span"));
+                            msgpack_pack_object(&mp_pck, *span);
+ //
+ //           for (index = 0; index < log_event.group_attributes->via.map.size; index++)
+ //           {
+ //               msgpack_pack_object(&mp_pck, log_event.group_attributes->via.map.ptr[index].key);
+ //               msgpack_pack_object(&mp_pck, log_event.group_attributes->via.map.ptr[index].val);
+ //           }
+ //
+ //           for (index = 0; index < log_event.metadata->via.map.size; index++)
+ //           {
+ //               msgpack_pack_object(&mp_pck, log_event.metadata->via.map.ptr[index].key);
+ //               msgpack_pack_object(&mp_pck, log_event.metadata->via.map.ptr[index].val);
+ //           }
+ //       }
+ //       else if (log_event.body != NULL) {
+ //           msgpack_pack_object(&mp_pck, *log_event.body);
+ //       }
+ //       else {
+ //           msgpack_pack_str(&mp_pck, 20);
+ //           msgpack_pack_str_body(&mp_pck, "log_attribute_missing", 20);
+ //       }    
+
+                            if (span->type == MSGPACK_OBJECT_MAP) {
+                                msgpack_object *spanKey = local_msgpack_map_lookup(span, "name");
+                                msgpack_object *spanVal = local_msgpack_map_lookup(span, "attributes");
+                                if (spanKey->type == MSGPACK_OBJECT_STR) {
+                                    msgpack_pack_str(&mp_pck, spanKey->via.str.size);
+                                    msgpack_pack_str_body(&mp_pck, spanKey->via.str.ptr, spanKey->via.str.size);
+                                }
+                            }
+                        }
+                    }
+                }
+
+
+        }
+
+        for (i = 0; i < root->via.map.size; i++) {
+            key = &root->via.map.ptr[i].key;
+            if (key->type != MSGPACK_OBJECT_STR) {
+                flb_plg_error(ctx->ins, "unexpected key type=%i", key->type);
+            }
+
+            if (key->via.str.size == 13 && strncmp(key.via.str.ptr, "resourceSpans", 13) == 0) {
+                val = &root->via.map.ptr[i].val;
+                if (val->type != MSGPACK_OBJECT_ARRAY) {
+                    flb_plg_error(ctx->ins, "unexpected 'error' value type=%i",
+                                  val->type);
+                }
+
+                /* resourceSpans array*/
+                for (j = 0; j < val->via.array.size; j++) {
+                        msgpack_object *resourceSpan = &val->via.array.ptr[j];
+                        if (resourceSpan->type == MSGPACK_OBJECT_MAP) {
+                            resource = local_msgpack_map_lookup(resourceSpan, "resource");
+                            schema_url = local_msgpack_map_lookup(resourceSpan, "schema_url");
+                            scope_spans = local_msgpack_map_lookup(resourceSpan, "scope_spans");
+
+                            /* scopeSpans array */
+                            if (scope->type == MSGPACK_OBJECT_ARRAY) {
+                                for (k = 0; k < scope->via.array.size; k++) {
+                                    msgpack_object *scopeSpan = &scope->via.array.ptr[k];
+                                    if (scopeSpan->type == MSGPACK_OBJECT_MAP) {
+                                        scope = local_msgpack_map_lookup(scopeSpan, "scope");
+                                        msgpack_object *scopeSpanVal = local_msgpack_map_lookup(scopeSpan, "spans");
+                                        if (scopeSpanKey->type == MSGPACK_OBJECT_STR) {
+                                            msgpack_pack_str(&mp_pck, scopeSpanKey->via.str.size);
+                                            msgpack_pack_str_body(&mp_pck, scopeSpanKey->via.str.ptr, scopeSpanKey->via.str.size);
+                                        }
+                                    }
+                                }
+                            }
+                            span = local_msgpack_map_lookup(resourceSpan, "spans");
+                            for (k = 0; k < resourceSpan->via.map.size; k++) {
+
+                            }
+                        }
+                    }
+            } else {
+                msgpack_pack_object(&mp_pck, root->via.map.ptr[i].key);
+                msgpack_pack_object(&mp_pck, root->via.map.ptr[i].val);
+            }
+
+        //printf("ROOT : \n\n");
+        //msgpack_object_print(stdout, *root);
+        //printf("\n\n");
+
+
+        //printf("ROOT Type : %d\n\n", root->type);
+
+        if (root->type == MSGPACK_OBJECT_MAP) { // resourceSpans
+            for (i = 0; i < root->via.map.size; i++) {
+                key = root->via.map.ptr[i].key;
+                if (key.via.str.size == 13 && strncmp(key.via.str.ptr, "resourceSpans", 13) == 0) {
+                    val = root->via.map.ptr[i].val;
+                    if (val.type == MSGPACK_OBJECT_ARRAY) {
+                        for (j = 0; j < val.via.array.size; j++) {
+                            if (val.via.array.ptr[j].type == MSGPACK_OBJECT_MAP) {
+                                for (k = 0; k < val.via.map.size; i++) {
+                                    msgpack_object *k1 = &val.via.array.ptr[k];
+                                    if (k1->via.str.size == 11 && strncmp(key.via.str.ptr, "scope_spans", 11) == 0) {
+                                    }
+                                }
+                                msgpack_object *map = &val.via.array.ptr[j];
+                                printf("MAP %d : \n\n", j);
+                                msgpack_object_print(stdout, *map);
+
+
+                            }
+                            
+                        // printf("ROOT VAL type: %d\n\n", val.type);
+                        //msgpack_object_print(stdout, val);
+                    }
+                }
+
+                // printf("ROOT key type: %d\n\n", key.type);
+                // msgpack_object_print(stdout, key);
+
+                // val = root->via.map.ptr[i].val;
+                // printf("ROOT VAL type: %d\n\n", val.type);
+                // msgpack_object_print(stdout, val);
+                
+                //printf("\n\nROOT key: %s\n\n", key.via.str.ptr);
+                }
+            }
+        }
+
+ 
  //
  //       flb_sds_t json_record = flb_msgpack_raw_to_json_sds(mp_sbuf.data, mp_sbuf.size);
  //       if (!json_record) {
