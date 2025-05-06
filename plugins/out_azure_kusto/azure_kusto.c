@@ -1135,6 +1135,8 @@ static int azure_kusto_traces_format(struct flb_azure_kusto *ctx, const char *ta
                         //msgpack_pack_str_body(&mp_pck, "span", flb_sds_len("span"));
                         //msgpack_pack_object(&mp_pck, *span);
 
+                        
+
                         flb_sds_t json_record = flb_msgpack_raw_to_json_sds(mp_sbuf.data, mp_sbuf.size);
                         if (!json_record){
                             flb_plg_error(ctx->ins, "error converting msgpack to JSON");
@@ -1142,6 +1144,8 @@ static int azure_kusto_traces_format(struct flb_azure_kusto *ctx, const char *ta
                             msgpack_sbuffer_destroy(&mp_sbuf);
                             return -1;
                         }
+
+                        printf("\n\nTrace: %s", json_record);
 
                         /* Concatenate the JSON record to the output buffer */
                         out_buf = flb_sds_cat(out_buf, json_record, flb_sds_len(json_record));
