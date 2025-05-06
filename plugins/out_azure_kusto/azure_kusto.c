@@ -1083,7 +1083,7 @@ static int azure_kusto_traces_format(struct flb_azure_kusto *ctx, const char *ta
                         msgpack_sbuffer_clear(&mp_sbuf);
 
                         int map_size = 1;
-                        if (ctx->include_time_key == FLB_TRUE) {
+                        if (ctx->include_time_key == false) {
                             map_size++;
                         }
                         if (ctx->include_tag_key == FLB_TRUE) {
@@ -1093,7 +1093,7 @@ static int azure_kusto_traces_format(struct flb_azure_kusto *ctx, const char *ta
                         msgpack_pack_map(&mp_pck, map_size);
                         
                         /* include_time_key */
-                        if (ctx->include_time_key == FLB_TRUE) {
+                        if (ctx->include_time_key == false) {
                             msgpack_pack_str(&mp_pck, flb_sds_len(ctx->time_key));
                             msgpack_pack_str_body(&mp_pck, ctx->time_key, flb_sds_len(ctx->time_key));
                         
