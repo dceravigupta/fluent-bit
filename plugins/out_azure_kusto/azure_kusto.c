@@ -1116,8 +1116,12 @@ static int azure_kusto_traces_format(struct flb_azure_kusto *ctx, const char *ta
                         
                         msgpack_pack_str(&mp_pck, flb_sds_len(ctx->log_key));
                         msgpack_pack_str_body(&mp_pck, ctx->log_key, flb_sds_len(ctx->log_key));
-                        msgpack_pack_object(&mp_pck, *span);
-                        //msgpack_pack_map(&mp_pck, 1);
+                        // msgpack_pack_object(&mp_pck, *span);
+                        msgpack_pack_map(&mp_pck, 1);
+                        msgpack_pack_str(&mp_pck, flb_sds_len(ctx->tag_key));
+                            msgpack_pack_str_body(&mp_pck, ctx->tag_key, flb_sds_len(ctx->tag_key));
+                            msgpack_pack_str(&mp_pck, tag_len);
+                            msgpack_pack_str_body(&mp_pck, tag, tag_len);
                         
                         //msgpack_pack_str(&mp_pck, flb_sds_len("resource"));
                         //msgpack_pack_str_body(&mp_pck, "resource", flb_sds_len("resource"));
